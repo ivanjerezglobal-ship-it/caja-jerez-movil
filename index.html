@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f3d3e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="robots" content="noindex, nofollow">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icono.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icono.svg">
+<link rel="stylesheet" href="estilo.css">
+<title>Caja Jerez · Celular</title>
+<style>
+  /* M-71 · pantalla de entrada (usuario y clave por persona) */
+  .login{position:fixed;inset:0;z-index:100;background:var(--fondo);display:flex;align-items:center;justify-content:center;padding:16px}
+  .login[hidden]{display:none}
+  .login .caja{width:100%;max-width:380px;background:var(--carta);border-radius:var(--radio);box-shadow:var(--sombra);padding:22px}
+  .login h1{font-size:1.25rem;margin:8px 0 4px}
+  .login .marca-l{display:flex;align-items:center;gap:10px;color:var(--marca);font-weight:700}
+  .login .marca-l img{width:36px;height:36px}
+  .login .msg{min-height:1.2em;color:var(--rojo);font-size:.9rem;margin:6px 0 10px}
+  .login .cola-l{color:var(--ambar);font-size:.85rem;margin-top:8px}
+</style>
+</head>
+<body>
+<div id="login" class="login" hidden>
+  <form id="login-form" class="caja" autocomplete="on">
+    <div class="marca-l"><img src="icono.svg" alt=""> Comercializadora Jerez</div>
+    <h1>Entrar al inventario</h1>
+    <p class="nota">Usa el correo y la clave que te dio el administrador.</p>
+    <label class="campo">Correo<input id="login-email" type="email" autocomplete="username" required></label>
+    <label class="campo">Clave<input id="login-clave" type="password" autocomplete="current-password" required></label>
+    <div id="login-msg" class="msg"></div>
+    <button class="btn primario ancho">Entrar</button>
+    <div id="login-cola" class="cola-l"></div>
+  </form>
+</div>
+
+<header class="barra">
+  <div class="marca"><img src="icono.svg" alt=""> Inventario</div>
+  <button id="chip-disp" class="chip" title="Nombre de este dispositivo"><span id="punto" class="punto"></span><span id="nombre-disp">—</span></button>
+</header>
+
+<main>
+  <!-- ESCANEAR -->
+  <section id="v-escanear" class="vista activa">
+    <div id="lugar-escaner-escanear">
+      <div id="bloque-escaner">
+        <div class="camara" id="camara">
+          <video id="video" playsinline muted></video>
+          <div class="mira"><span></span></div>
+          <div id="cam-msg" class="cam-msg">Toca <b>Iniciar cámara</b> para escanear</div>
+        </div>
+        <div class="fila-cam">
+          <button id="btn-cam" class="btn primario grande">📷 Iniciar cámara</button>
+          <button id="btn-linterna" class="btn icono" hidden title="Linterna">🔦</button>
+        </div>
+        <form id="form-manual" class="manual" autocomplete="off">
+          <input id="codigo-manual" inputmode="numeric" placeholder="Escribe o usa un lector de códigos…" enterkeyhint="search">
+          <button class="btn">Buscar</button>
+        </form>
+      </div>
+    </div>
+    <h3 class="sub">Últimos movimientos</h3>
+    <ul id="ultimos" class="lista compacta"></ul>
+  </section>
+
+  <!-- INVENTARIO: contar por zona Local / Bodega -->
+  <section id="v-inventario" class="vista">
+    <div id="inv-cab"></div>
+    <div id="lugar-escaner-inventario"></div>
+    <div id="inv-cola"></div>
+    <div id="inv-cuerpo"></div>
+  </section>
+
+  <!-- PRODUCTOS -->
+  <section id="v-productos" class="vista">
+    <div class="buscador">
+      <input id="buscar" type="search" placeholder="Buscar producto, código o departamento">
+    </div>
+    <div class="chips" id="filtros">
+      <button class="chip-f activo" data-f="">Todos</button>
+      <button class="chip-f" data-f="bajo">⚠️ Bajo mínimo</button>
+      <button class="chip-f" data-f="sin_codigo">Sin código</button>
+      <select id="filtro-depto"><option value="">Departamento…</option></select>
+    </div>
+    <div class="conteo" id="conteo"></div>
+    <ul id="lista-prod" class="lista"></ul>
+    <button id="btn-nuevo" class="fab" title="Nuevo producto">＋</button>
+  </section>
+
+  <!-- HISTORIAL -->
+  <section id="v-historial" class="vista">
+    <h2>Historial de movimientos</h2>
+    <ul id="lista-hist" class="lista compacta"></ul>
+  </section>
+
+  <!-- RESUMEN -->
+  <section id="v-ajustes" class="vista">
+    <h2>Resumen</h2>
+    <div class="kpis" id="kpis"></div>
+    <h2>Este dispositivo</h2>
+    <label class="campo">Nombre (aparece en el historial)
+      <input id="input-disp" maxlength="30">
+    </label>
+    <h2>Datos y respaldos</h2>
+    <a class="btn ancho" href="#" id="btn-exportar">📊 Descargar inventario para Excel</a>
+    <button class="btn ancho" id="btn-respaldo">💾 ¿Dónde se guarda?</button>
+    <p class="nota">Todo se guarda en la nube (Supabase) y el PC del local mantiene una copia con respaldos cada 10 minutos.
+      Sin internet puedes seguir buscando, escaneando y moviendo stock: los cambios quedan en este teléfono y se envían solos al volver la conexión.</p>
+    <p class="nota" id="info-servidor"></p>
+    <button class="btn ancho peligro" id="btn-salir">Cerrar sesión</button>
+  </section>
+</main>
+
+<nav class="tabs">
+  <button data-v="escanear" class="activo"><span>📷</span>Escanear</button>
+  <button data-v="productos"><span>📦</span>Productos</button>
+  <button data-v="inventario"><span>📋</span>Inventario</button>
+  <button data-v="historial"><span>🕘</span>Historial</button>
+  <button data-v="ajustes"><span>📊</span>Resumen</button>
+</nav>
+
+<div id="velo" class="velo" hidden></div>
+<div id="hoja" class="hoja" hidden>
+  <div class="asa"></div>
+  <button class="cerrar" id="cerrar-hoja" aria-label="Cerrar">✕</button>
+  <div id="hoja-cont"></div>
+</div>
+
+<div id="toast" class="toast"></div>
+<input type="file" id="input-foto" accept="image/*" capture="environment" hidden>
+<script src="nube.js"></script>
+<script src="app.js"></script>
+<script>
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function () {});
+</script>
+</body>
+</html>
