@@ -1,7 +1,7 @@
 /* Comercializadora Jerez · app del celular por internet (M-71)
    Guarda la app en el teléfono para que abra sin internet. Los datos (Supabase) no pasan por aquí:
    la app los guarda aparte y los sincroniza sola. */
-const CACHE = "caja-jerez-movil-20261111-205904";
+const CACHE = "caja-jerez-movil-20261111-211433";
 const APP = ["./", "index.html", "app.js", "nube.js", "estilo.css", "manifest.webmanifest", "icono.svg"];
 const LECTOR = "https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js";
 

@@ -718,13 +718,18 @@
   }
 
   function infoConexion() {
-    const quien = N.perfil ? `${N.perfil.nombre || (N.sesion && N.sesion.email) || ""} (${N.perfil.rol})` : "";
+    const ROL = { admin: "administrador", creador: "supervisor", cajero: "cajero" };
+    const quien = N.perfil ? `${N.perfil.nombre || (N.sesion && N.sesion.email) || ""} (${ROL[N.perfil.rol] || N.perfil.rol})` : "";
     const cuando = N.ultimaSync ? fechaLocal(N.ultimaSync).slice(11, 16) : "—";
     return `Conectado a la nube (Supabase) como <b>${quien.replace(/[<>&]/g, "")}</b> · al día a las ${cuando}` +
       (N.cola.length ? ` · <b>${N.cola.length}</b> movimiento(s) esperando internet` : "");
   }
 
-  window.NUBE = { api, infoConexion, sincronizar, urlFoto, estado: () => N };
+  // M-77 · administrador y supervisor (creador) pueden todo; el cajero no edita productos existentes,
+  // no usa el conteo exacto ni abre/cierra inventarios (la base lo exige igual; esto solo oculta botones)
+  const esSupervisor = () => !!(N.perfil && ["admin", "creador"].includes(N.perfil.rol));
+
+  window.NUBE = { api, infoConexion, sincronizar, urlFoto, esSupervisor, estado: () => N };
 
   /* ---------------- arranque ---------------- */
   prepararLogin();

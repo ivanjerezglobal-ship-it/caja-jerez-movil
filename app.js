@@ -109,6 +109,10 @@ function irA(v) {
 }
 $$(".tabs button").forEach(b => b.onclick = () => irA(b.dataset.v));
 
+// M-77 · en la app por internet el cajero no ve los botones de editar, conteo exacto ni abrir/cerrar inventario
+// (en el Wi-Fi del local no hay usuarios: se ve todo)
+const esSupervisor = () => !window.NUBE || window.NUBE.esSupervisor();
+
 // M-72 · la foto sale del PC (Wi-Fi del local) o de la nube (app por internet); mismo nombre de archivo
 const urlFoto = n => window.NUBE ? window.NUBE.urlFoto(n) : "imagenes/" + encodeURIComponent(n);
 function miniatura(p) {
@@ -294,8 +298,8 @@ function mostrarProducto(p) {
       <button class="btn sumar" id="b-sumar">+ Sumar</button>
     </div>
     <div class="enlaces">
-      <button class="btn" id="b-ajuste">🔢 Conteo exacto</button>
-      <button class="btn" id="b-editar">✏️ Editar</button>
+      ${esSupervisor() ? `<button class="btn" id="b-ajuste">🔢 Conteo exacto</button>
+      <button class="btn" id="b-editar">✏️ Editar</button>` : ""}
       <button class="btn" id="b-foto">🖼️ Foto</button>
       <button class="btn" id="b-hist">🕘 Movimientos</button>
     </div>`);
@@ -305,8 +309,8 @@ function mostrarProducto(p) {
   pulsador($("#st-mas"), () => { $("#cant").value = cant() + 1; });
   $("#b-restar").onclick = () => mover(p, -cant());
   $("#b-sumar").onclick = () => mover(p, cant());
-  $("#b-ajuste").onclick = () => formAjuste(p);
-  $("#b-editar").onclick = () => formProducto(p);
+  if ($("#b-ajuste")) $("#b-ajuste").onclick = () => formAjuste(p);
+  if ($("#b-editar")) $("#b-editar").onclick = () => formProducto(p);
   $("#b-foto").onclick = $("#foto-p").onclick = () => pedirFoto(p);
   $("#b-hist").onclick = () => historialProducto(p);
 }
@@ -562,12 +566,12 @@ async function pintarInventario() {
     cab.innerHTML = `<div class="inv-tarjeta"><h2>Inventario</h2>
       <p class="nota">Cuenta los productos escaneándolos, por zona: <b>Local</b> y <b>Bodega</b>. Varios teléfonos pueden contar a la vez.
       Al cerrar, el stock de cada producto queda como Local + Bodega.</p>
-      <label class="campo">Nombre del inventario<input id="inv-nombre" value="Inventario ${new Date().toLocaleDateString("es-CL")}"></label>
-      <button class="btn primario ancho" id="inv-empezar">▶ Empezar inventario</button></div>`;
+      ${esSupervisor() ? `<label class="campo">Nombre del inventario<input id="inv-nombre" value="Inventario ${new Date().toLocaleDateString("es-CL")}"></label>
+      <button class="btn primario ancho" id="inv-empezar">▶ Empezar inventario</button>` : `<p class="nota"><b>No hay un inventario abierto.</b> Pide a un administrador o supervisor que lo abra; apenas lo haga podrás contar desde aquí.</p>`}</div>`;
     cuerpo.innerHTML = hist.length ? `<h3 class="sub">Inventarios anteriores</h3><ul class="lista compacta">${hist.map(h => `<li class="item" data-inf="${h.id}">
       <div class="info"><div class="nom">${esc(h.nombre)}</div><div class="det">${h.estado === "cerrado" ? "Cerrado " + fechaCorta(h.cerrado || "") : h.estado}
       · ${h.productos} productos${h.resultado ? " · " + h.resultado.con_diferencia + " con diferencia" : ""}</div></div></li>`).join("")}</ul>` : "";
-    $("#inv-empezar").onclick = async () => {
+    if ($("#inv-empezar")) $("#inv-empezar").onclick = async () => {
       try { S.conteo = await api("conteos", { method: "POST", body: { nombre: $("#inv-nombre").value } }); toast("Inventario abierto", "ok"); pintarInventario(); }
       catch (e) { toast(e.message, "error"); }
     };
@@ -581,13 +585,13 @@ async function pintarInventario() {
     <div class="nota">Este teléfono cuenta en: <b>${S.zona}</b>. Cada lectura suma 1.</div>
     <div class="inv-stats"><div><b>${loc}</b><span>Local</span></div><div><b>${bod}</b><span>Bodega</span></div><div><b>${loc + bod}</b><span>Total contado</span></div></div>
     ${k.por_dispositivo.length ? `<div class="nota" style="margin-top:8px">${k.por_dispositivo.map(d => `${esc(d.dispositivo)} (${d.zona}): ${d.unidades} un.`).join(" · ")}</div>` : ""}
-    <div class="dos" style="margin-top:10px"><button class="btn primario" id="inv-cerrar">✔ Cerrar inventario</button><button class="btn peligro" id="inv-anular">Anular</button></div></div>`;
+    ${esSupervisor() ? `<div class="dos" style="margin-top:10px"><button class="btn primario" id="inv-cerrar">✔ Cerrar inventario</button><button class="btn peligro" id="inv-anular">Anular</button></div>` : `<p class="nota" style="margin-top:10px">Al terminar de contar, avisa a un administrador o supervisor para que cierre el inventario.</p>`}</div>`;
   cuerpo.innerHTML = `<h3 class="sub">Contado (lo último arriba)</h3><ul class="lista compacta">${k.items.map(i => `<li class="item" data-cnt="${i.id}">
       <div class="info"><div class="nom">${esc(i.nombre)}</div><div class="det">Local ${i.local} · Bodega ${i.bodega} · total <b>${i.total}</b> · sistema ${i.existencia}</div></div>
       ${fmtDif(i.diferencia)}</li>`).join("") || '<li class="vacio">Escanea el primer producto</li>'}</ul>`;
   $$("[data-zona]").forEach(b => b.onclick = () => { S.zona = b.dataset.zona; guardar("inv_zona", S.zona); pintarInventario(); });
-  $("#inv-cerrar").onclick = prepararCierre;
-  $("#inv-anular").onclick = async () => {
+  if ($("#inv-cerrar")) $("#inv-cerrar").onclick = prepararCierre;
+  if ($("#inv-anular")) $("#inv-anular").onclick = async () => {
     if (!confirm("¿Anular este inventario? No se cambia ningún stock.")) return;
     try { await api(`conteos/${k.id}/anular`, { method: "POST" }); toast("Inventario anulado"); pintarInventario(); } catch (e) { toast(e.message, "error"); }
   };
