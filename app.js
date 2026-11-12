@@ -34,13 +34,33 @@ async function api(ruta, opts = {}) {
   if (window.NUBE) return window.NUBE.api(ruta, opts);
   const r = await fetch("api/" + ruta, {
     method: opts.method || "GET",
-    headers: { "Content-Type": "application/json", "X-App": "inventario-movil", "X-Dispositivo": S.dispositivo },
+    headers: { "Content-Type": "application/json", "X-App": "inventario-movil", "X-Dispositivo": S.dispositivo, "X-API-Key": leer("inv_clave", "") },
     body: opts.body ? JSON.stringify(opts.body) : undefined,
   });
   let data = null;
   try { data = await r.json(); } catch (e) {}
+  if (r.status === 401) pedirClave();
   if (!r.ok) { const err = new Error((data && data.error) || "Error " + r.status); err.status = r.status; throw err; }
   return data;
+}
+
+/* M-76 · los celulares del Wi-Fi del local entran con la clave que muestra Caja Jerez (Configuración → Celulares) */
+function pedirClave() {
+  if (!$("#hoja").hidden && $("#f-clave")) return;
+  abrirHoja(`<h2>Clave del local</h2>
+    <p class="nota">Escribe la clave de 6 números que aparece en <b>Caja Jerez → Configuración → Celulares</b>. Se pide una sola vez en este teléfono.</p>
+    <form id="f-clave"><input id="clave-n" inputmode="numeric" maxlength="12" autocomplete="off">
+    <button class="btn primario ancho" style="margin-top:12px">Entrar</button></form>`);
+  $("#clave-n").focus();
+  $("#f-clave").onsubmit = async e => {
+    e.preventDefault();
+    guardar("inv_clave", $("#clave-n").value.trim());
+    cerrarHoja();
+    try {
+      await cargarResumen(); toast("Clave correcta", "ok"); refrescarVista();
+      if (!S.dispositivo) pedirNombre();
+    } catch (err) { }
+  };
 }
 
 /* ---------------- UI básicos ---------------- */
@@ -89,8 +109,10 @@ function irA(v) {
 }
 $$(".tabs button").forEach(b => b.onclick = () => irA(b.dataset.v));
 
+// M-72 · la foto sale del PC (Wi-Fi del local) o de la nube (app por internet); mismo nombre de archivo
+const urlFoto = n => window.NUBE ? window.NUBE.urlFoto(n) : "imagenes/" + encodeURIComponent(n);
 function miniatura(p) {
-  return p.imagen ? `<img class="mini" src="imagenes/${encodeURIComponent(p.imagen)}" loading="lazy" alt="">` : `<div class="mini">🧴</div>`;
+  return p.imagen ? `<img class="mini" src="${urlFoto(p.imagen)}" loading="lazy" alt="">` : `<div class="mini">🧴</div>`;
 }
 function hora(f) { return (f || "").slice(11, 16); }
 function fechaCorta(f) {
@@ -253,7 +275,7 @@ function mostrarProducto(p) {
   const bajo = p.existencia <= p.minimo;
   abrirHoja(`
     <div class="prod-cab">
-      ${p.imagen ? `<img class="foto" id="foto-p" src="imagenes/${encodeURIComponent(p.imagen)}" alt="">` : `<button class="foto" id="foto-p" title="Agregar foto">📷</button>`}
+      ${p.imagen ? `<img class="foto" id="foto-p" src="${urlFoto(p.imagen)}" alt="">` :`<button class="foto" id="foto-p" title="Agregar foto">📷</button>`}
       <div><h3>${esc(p.nombre)}</h3>
       <div class="det">${p.codigo ? esc(p.codigo) : "<b style='color:var(--ambar)'>Sin código</b>"} · ${esc(p.departamento)}</div>
       <div class="det">Venta ${clp(p.venta)} · Costo ${clp(p.costo)}</div>
@@ -278,14 +300,31 @@ function mostrarProducto(p) {
       <button class="btn" id="b-hist">🕘 Movimientos</button>
     </div>`);
   const cant = () => Math.max(1, parseInt($("#cant").value, 10) || 1);
-  $("#st-menos").onclick = () => $("#cant").value = Math.max(1, cant() - 1);
-  $("#st-mas").onclick = () => $("#cant").value = cant() + 1;
+  // M-73 · − y + cambian la cantidad; manteniéndolos presionados siguen cambiando
+  pulsador($("#st-menos"), () => { $("#cant").value = Math.max(1, cant() - 1); });
+  pulsador($("#st-mas"), () => { $("#cant").value = cant() + 1; });
   $("#b-restar").onclick = () => mover(p, -cant());
   $("#b-sumar").onclick = () => mover(p, cant());
   $("#b-ajuste").onclick = () => formAjuste(p);
   $("#b-editar").onclick = () => formProducto(p);
   $("#b-foto").onclick = $("#foto-p").onclick = () => pedirFoto(p);
   $("#b-hist").onclick = () => historialProducto(p);
+}
+
+// M-73 · botón que actúa al tocarlo y, si se mantiene presionado, repite (rápido después de medio segundo)
+function pulsador(btn, accion) {
+  let t1 = null, t2 = null, repitio = false;
+  const parar = () => { clearTimeout(t1); clearInterval(t2); t1 = t2 = null; };
+  btn.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    repitio = false;
+    accion(); vibrar(15);
+    t1 = setTimeout(() => { repitio = true; t2 = setInterval(accion, 90); }, 450);
+  });
+  ["pointerup", "pointerleave", "pointercancel"].forEach(ev => btn.addEventListener(ev, parar));
+  btn.addEventListener("contextmenu", e => e.preventDefault());
+  // teclado o lector de pantalla (sin puntero): un clic = un paso
+  btn.addEventListener("click", e => { if (e.detail === 0) accion(); });
 }
 
 let enviando = false;
@@ -642,6 +681,8 @@ $$(".chip-f").forEach(b => b.onclick = () => {
 });
 $("#filtro-depto").onchange = e => { S.depto = e.target.value; pintarProductos(); };
 $("#btn-nuevo").onclick = () => formProducto(null);
+// M-76 · el Excel del Wi-Fi también necesita la clave (en internet lo arma nube.js)
+if (!window.NUBE) $("#btn-exportar").onclick = e => { e.currentTarget.href = "api/exportar.csv?clave=" + encodeURIComponent(leer("inv_clave", "")); };
 $("#btn-respaldo").onclick = async () => {
   try { const r = await api("respaldo", { method: "POST" }); toast("Respaldo creado: " + r.archivo, "ok"); } catch (e) { toast(e.message, "error"); }
 };

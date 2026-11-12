@@ -87,7 +87,10 @@ input:focus,select:focus{outline:2px solid var(--marca2);outline-offset:0;border
 .gran-stock .num{font-size:3rem;font-weight:800;line-height:1}
 .gran-stock .num.bajo{color:var(--rojo)}
 .gran-stock .lbl{font-size:.82rem;color:var(--suave);margin-top:4px}
+/* M-73 · sin zoom por doble toque: tocar + o − seguido cuenta cada toque */
+button,.btn,input,select,a{touch-action:manipulation}
 .stepper{display:flex;align-items:center;justify-content:center;gap:10px;margin:16px 0}
+.stepper button{user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
 .stepper button{width:56px;height:56px;border-radius:50%;border:1px solid var(--borde);background:#fff;font-size:1.6rem;font-weight:700}
 .stepper input{width:96px;text-align:center;font-size:1.6rem;font-weight:700}
 .acciones{display:grid;grid-template-columns:1fr 1fr;gap:10px}

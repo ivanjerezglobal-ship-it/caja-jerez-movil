@@ -252,9 +252,43 @@
   function pendienteDe(id) {
     return N.cola.reduce((a, m) => a + (m.producto_id === id ? m.cantidad : 0), 0);
   }
-  // producto como lo ve la app: stock de la nube + lo que este teléfono aún no envía; sin fotos por ahora
+  // producto como lo ve la app: stock de la nube + lo que este teléfono aún no envía
   function ver(p) {
-    return { ...p, existencia: (p.existencia || 0) + pendienteDe(p.id), imagen: "" };
+    return { ...p, existencia: (p.existencia || 0) + pendienteDe(p.id) };
+  }
+  // M-72 · fotos públicas de la carpeta «productos» de Supabase Storage (mismo nombre que en el PC)
+  const urlFoto = n => `${URL_SB}/storage/v1/object/public/productos/${encodeURIComponent(n)}`;
+
+  async function subirFoto(id, dataUrl) {
+    const m = /^data:image\/(jpeg|png|webp);base64,(.+)$/.exec(dataUrl || "");
+    if (!m) throw falla("Imagen inválida", 400);
+    const bin = atob(m[2]);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    if (bytes.length > 5000000) throw falla("Imagen demasiado grande (máx. 5 MB)", 400);
+    const ext = m[1] === "jpeg" ? "jpg" : m[1];
+    const nombre = `nube_${id}_${Date.now()}.${ext}`;
+    let r;
+    try {
+      r = await fetch(`${URL_SB}/storage/v1/object/productos/${nombre}`, {
+        method: "POST",
+        headers: { apikey: CLAVE, Authorization: "Bearer " + (await token()), "Content-Type": "image/" + m[1], "x-upsert": "false" },
+        body: bytes,
+      });
+    } catch (e) {
+      N.enLinea = false;
+      throw falla("Sin conexión a internet: la foto se sube cuando vuelva");
+    }
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw falla("No se pudo subir la foto: " + traducir(d.message || d.error || r.status), r.status >= 500 ? r.status : 400);
+    }
+    const t = await sb(`productos?id=eq.${Number(id)}`, { method: "PATCH", body: { imagen: nombre }, prefer: "return=representation" });
+    if (!t || !t.length) throw falla("Producto no encontrado", 404);
+    mezclar(t);
+    N.version++;
+    guardarTodo();
+    return ver(t[0]);
   }
   const buscarId = id => N.prods.find(p => p.id === Number(id));
 
@@ -547,8 +581,8 @@
         guardarTodo();
         return ver(p);
       }
-      if (partes[2] === "imagen") {
-        throw falla("Por ahora las fotos se agregan desde el Wi-Fi del local", 400);
+      if (partes[2] === "imagen" && metodo === "POST") {
+        return subirFoto(partes[1], body.imagen);
       }
       if (partes.length === 2 && metodo === "GET") {
         await asegurarCatalogo();
@@ -690,7 +724,7 @@
       (N.cola.length ? ` · <b>${N.cola.length}</b> movimiento(s) esperando internet` : "");
   }
 
-  window.NUBE = { api, infoConexion, sincronizar, estado: () => N };
+  window.NUBE = { api, infoConexion, sincronizar, urlFoto, estado: () => N };
 
   /* ---------------- arranque ---------------- */
   prepararLogin();
